@@ -1,2 +1,6 @@
 /target
 .vscode
+hello_world
+*.asm
+*.o
+test*
