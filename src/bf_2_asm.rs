@@ -9,7 +9,7 @@ fn operation(char: &str, mut indent: usize, mut last_label: i32, labels: &mut Ve
         "<" => {format!("{}sub rcx, {}\n",indent_text, num)},
         ">" => {format!("{}add rcx, {}\n",indent_text, num)},
         "." => {format!("{}mov rax, [array+rcx]\n{}call print_char\n",indent_text, indent_text)},
-        "," => {format!("{}call get_char\n{}mov rax, [array+rcx]\n",indent_text, indent_text)},
+        "," => {format!("{}call print_buffer\n{}call get_char\n", indent_text, indent_text)},
         "[" => {
             indent += 1;
             last_label += 1;
@@ -35,37 +35,61 @@ pub fn run(input_path: &str, output_path: &str) -> u8 {
     
 section .data
     array: times 100000 db 0
+    buffer: times 100 db 0
+    temp dq 0
     
 section .text
     
-print_char:
+print_buffer:
     push rcx
-    push rax
-    mov rax, 1      ; syscall for syswrite
-    mov rdi, 1      ; stdout file descriptor
-    mov rsi, rsp    ; bytes to write (by reference?)
-    mov rdx, 1      ; number of bytes to write
-    syscall         ; call syscall
-    pop rax
+
+    mov rax, 1          ; syscall for syswrite
+    mov rdi, 1          ; stdout file descriptor
+    mov rsi, buffer     ; bytes to write (by reference?)
+    mov rdx, rbx        ; number of bytes to write
+    syscall             ; call syscall
+
+    mov rbx, 0
     pop rcx
+    ret
+
+print_char:
+    mov [buffer+rbx], rax
+    add rbx, 1
+    cmp rbx, 100
+    jne no_print
+    call print_buffer
+    no_print:
     ret
     
 get_char:
     push rcx
+    push rbx
     push rax
+
     mov rax, 0      ; syscall for sysread
     mov rdi, 0      ; stdin file descriptor
     mov rsi, rsp    ; bytes to write (by reference?)
     mov rdx, 1      ; number of bytes to write
     syscall         ; call syscall
+
+    mov rax, 0      ; syscall for sysread
+    mov rdi, 0      ; stdin file descriptor
+    mov rsi, temp   ; bytes to write (by reference?)
+    mov rdx, 1      ; number of bytes to write
+    syscall         ; call syscall
+
     pop rax
+    pop rbx
     pop rcx
+    mov [array+rcx], rax
     ret
     
-    _start:
+_start:
     xor rcx, rcx    ; rcx is mem_pointer
     mov r9, 1       ; r9 is just to make memory increments
     mov r10, 0      ; r10 is just to make memory comparisons
+    mov rbx, 0
     
 ").unwrap();
     
@@ -93,6 +117,7 @@ get_char:
     file.write_all(buffer.as_bytes()).unwrap();
 
     file.write_all(b"
+    call print_buffer
     mov rax, 60
     mov rdi, 0
     syscall
